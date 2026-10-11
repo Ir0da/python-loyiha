@@ -1,65 +1,77 @@
-import asyncio
 import os
-from aiohttp import web
+import psycopg2
+from contextlib import contextmanager
 
-from aiogram import Bot, Dispatcher
-from aiogram.fsm.storage.memory import MemoryStorage
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
-from core.auth import build_auth_router
-from core.config import BASE_URL, need
-from core.db import init_db
-from core.hemis import close_session
-from . import ROLE, handlers_daily, handlers_overall, handlers_semester
-from .keyboards import main_keyboard
+# Render va PostgreSQL o'rtasidagi prefiks xatoligini to'g'rilash
+if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-
-# 🌐 Render serveri "Timed Out" xatosi bermasligi uchun soxta sahifa funksiyasi
-async def handle(request):
-    return web.Response(text="Bot muvaffaqiyatli ishlamoqda!")
-
-
-# 🛠 Soxta serverni ishga tushiruvchi yordamchi funksiya
-async def start_fake_server():
-    app = web.Application()
-    app.router.add_get('/', handle)
-    runner = web.AppRunner(app)
-    await runner.setup()
-    
-    port = int(os.environ.get("PORT", 10000)) 
-    site = web.TCPSite(runner, '0.0.0.0', port)
-    await site.start()
-    print(f"🌐 Soxta Web Server {port}-portda fonda ishlamoqda...")
-
-
-async def main():
-    init_db()
-
-    bot = Bot(token=need("STUDENT_BOT_TOKEN"))
-    dp = Dispatcher(storage=MemoryStorage())
-
-    dp.include_router(
-        build_auth_router(
-            ROLE,
-            BASE_URL,
-            main_keyboard,
-            "Assalomu alaykum! 👋\n\nHEMIS loginingizni (ID raqamingizni) kiriting:",
-        )
-    )
-    dp.include_router(handlers_daily.router)
-    dp.include_router(handlers_semester.router)
-    dp.include_router(handlers_overall.router)
-
-    # 🚀 RENDER UCHUN SOXTA VEB-SERVERNI ASINXRON VAZIFA SIFATIDA ISHGA TUSHIRAMIZ:
-    # Bu kod bot ishga tushishidan oldin serverni fonda parallel ravishda yoqib qo'yadi
-    asyncio.create_task(start_fake_server())
-
-    print("🤖 O'quvchi boti ishga tushdi...")
+@contextmanager
+def _conn():
+    """PostgreSQL bazasiga xavfsiz va barqaror ulanish yaratish."""
+    # sslmode="require" ba'zi tizimlarda xato berishi mumkin, dynamic tekshiramiz
+    conn = psycopg2.connect(DATABASE_URL, sslmode="require")
     try:
-        await dp.start_polling(bot)
+        yield conn
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
     finally:
-        await close_session()
-        await bot.session.close()
+        conn.close()
 
+def init_db():
+    """Bot birinchi marta yonganda accounts jadvalini yaratadi."""
+    with _conn() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS accounts (
+                    telegram_id BIGINT,
+                    role TEXT,
+                    login TEXT,
+                    token TEXT,
+                    PRIMARY KEY (telegram_id, role)
+                )
+                """
+            )
+        print("📊 PostgreSQL ma'lumotlar bazasi va jadvallar muvaffaqiyatli tayyorlandi.")
 
-if __name__ == "__main__":
-    asyncio.run(main())
+def save_user(telegram_id, role, login, token):
+    """Foydalanuvchi ma'lumotlarini saqlash yoki yangilash (Upsert)."""
+    with _conn() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO accounts (telegram_id, role, login, token)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (telegram_id, role)
+                DO UPDATE SET login = EXCLUDED.login, token = EXCLUDED.token
+                """,
+                (int(telegram_id), str(role), str(login), str(token)),
+            )
+
+def get_token(telegram_id, role):
+    """Foydalanuvchi tokenini bazadan o'qib olish."""
+    with _conn() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT token FROM accounts WHERE telegram_id = %s AND role = %s",
+                (int(telegram_id), str(role)),
+            )
+            row = cursor.fetchone()
+    
+    if row and isinstance(row, (tuple, list)) and len(row) > 0:
+        return row[0]
+    return None
+
+def delete_user(telegram_id, role):
+    """Foydalanuvchi tizimdan chiqqanda ma'lumotlarini o'chirish."""
+    with _conn() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "DELETE FROM accounts WHERE telegram_id = %s AND role = %s",
+                (int(telegram_id), str(role)),
+            )
