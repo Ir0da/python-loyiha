@@ -19,7 +19,6 @@ def _parse_subject(item):
     if not isinstance(item, dict):
         return None
 
-    # Yangi format: {"subject": {...}}, eski format: to'g'ridan-to'g'ri
     obj = item.get("subject") if isinstance(item.get("subject"), dict) else item
 
     name = get_obj_value(obj, "name", "title", "subject_name", "subjectName")
@@ -68,7 +67,7 @@ async def _bulk_attendance(token, code):
     try:
         return await get_all(BASE_URL, ATTENDANCE, token, {"semester": str(code)})
     except ApiError:
-        return []  # TokenExpired bu yerda ushlanmaydi, yuqoriga ketadi
+        return []
 
 
 async def _subject_attendance(token, code, subject_id):
@@ -119,7 +118,6 @@ def _totals(items):
 async def load_semester_rows(token, semester):
     code = semester["code"]
 
-    # Fanlar va davomat bir vaqtda olinadi
     subjects, bulk = await asyncio.gather(
         get_subjects(token, code),
         _bulk_attendance(token, code),
@@ -143,16 +141,27 @@ async def load_selected_semester(token, semester_id):
     return selected, await load_semester_rows(token, selected)
 
 
+# ✅ TO'G'RILANDI: Umumiy davomatni yuklash funksiyasi
 async def load_overall(token):
     semesters = await get_semesters(token)
     all_rows = await asyncio.gather(
         *(load_semester_rows(token, s) for s in semesters)
     )
+    return [
+        {
+            "name": semester["name"],
+            "absent": sum(r["absent"] for r in rows),
+            "subject_count": len(rows),
+        }
+        for semester, rows in zip(semesters, all_rows)
+    ]
+
+
+# ✅ TO'G'RILANDI: Kunlik davomatni yuklash funksiyasi
 async def load_daily(token, start, end):
     """[start, end] oralig'ida qoldirilgan darslar."""
     semesters = await get_semesters(token)
 
-    # Barcha semestrlar davomati parallel (har biri BITTA so'rov)
     lists = await asyncio.gather(
         *(_bulk_attendance(token, s["code"]) for s in semesters)
     )
@@ -194,12 +203,3 @@ async def load_daily(token, start, end):
 
     rows.sort(key=lambda r: (r["date"], r["pair"], r["subject"]))
     return rows
-
-    return [
-        {
-            "name": semester["name"],
-            "absent": sum(r["absent"] for r in rows),
-            "subject_count": len(rows),
-        }
-        for semester, rows in zip(semesters, all_rows)
-    ]
