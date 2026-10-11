@@ -18,6 +18,19 @@ async def handle(request):
     return web.Response(text="Bot muvaffaqiyatli ishlamoqda!")
 
 
+# 🛠 Soxta serverni ishga tushiruvchi yordamchi funksiya
+async def start_fake_server():
+    app = web.Application()
+    app.router.add_get('/', handle)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    
+    port = int(os.environ.get("PORT", 10000)) 
+    site = web.TCPSite(runner, '0.0.0.0', port)
+    await site.start()
+    print(f"🌐 Soxta Web Server {port}-portda fonda ishlamoqda...")
+
+
 async def main():
     init_db()
 
@@ -36,16 +49,9 @@ async def main():
     dp.include_router(handlers_semester.router)
     dp.include_router(handlers_overall.router)
 
-    # 🚀 RENDER UCHUN SOXTA VEB-SERVERNI ISHGA TUSHIRISH QISMI:
-    app = web.Application()
-    app.router.add_get('/', handle)
-    runner = web.AppRunner(app)
-    await runner.setup()
-    
-    # Render avtomatik taqdim etadigan 10000-portni tinglaymiz
-    port = int(os.environ.get("PORT", 10000)) 
-    site = web.TCPSite(runner, '0.0.0.0', port)
-    await site.start()
+    # 🚀 RENDER UCHUN SOXTA VEB-SERVERNI ASINXRON VAZIFA SIFATIDA ISHGA TUSHIRAMIZ:
+    # Bu kod bot ishga tushishidan oldin serverni fonda parallel ravishda yoqib qo'yadi
+    asyncio.create_task(start_fake_server())
 
     print("🤖 O'quvchi boti ishga tushdi...")
     try:
