@@ -96,8 +96,7 @@ def build_daily_report(title, rows):
     head = f"📅 <b>{escape_text(title)}</b>"
 
     if not rows:
-        # ☀️ YANGILANDI: Agar so'ralgan kun yakshanbaga to'g'ri kelsa, dam olish kuni xabarini beramiz
-        # Sarlavha ichidan kun nomini qidirib tekshiramiz
+        # ☀️ 1. YAKSHANBA KUNI TEKSHIRUVI:
         if "Yakshanba" in title:
             return (
                 f"{head}\n\n"
@@ -105,7 +104,16 @@ def build_daily_report(title, rows):
                 "O'quv rejasida yakshanba kunlari uchun darslar ko'zda tutilmagan."
             )
         
-        # Standart holat (agar dars kunida o'qituvchi davomat kiritmagan bo'lsa)
+        # 📝 2. SHANBA VA BAYRAM KUNLARI TEKSHIRUVI:
+        # (Jumla universal holatga keltirildi: dars bo'lmagan yoki talaba qoldirmagan)
+        if "Shanba" in title:
+            return (
+                f"{head}\n\n"
+                "✅ Bu davrda qoldirilgan dars yo'q.\n"
+                "ℹ️ <i>Agar bugun dars mashg'ulotlari belgilangan bo'lsa, demak talaba barcha darslarga to'liq qatnashgan.</i>"
+            )
+
+        # 🏫 3. ODDY DARS KUNLARI (Dushanba - Juma):
         return (
             f"{head}\n\n"
             "✅ Bu davrda qoldirilgan dars yo'q.\n\n"
@@ -113,6 +121,7 @@ def build_daily_report(title, rows):
             "kiritgandan keyin chiqadi.</i>"
         )
 
+    # Dars qoldirilgan kunlar uchun hisobot qismi (o'zgarmadi)
     lines = [head, ""]
     current_date = None
     total = 0.0
