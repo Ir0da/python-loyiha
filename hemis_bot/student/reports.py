@@ -96,6 +96,16 @@ def build_daily_report(title, rows):
     head = f"📅 <b>{escape_text(title)}</b>"
 
     if not rows:
+        # ☀️ YANGILANDI: Agar so'ralgan kun yakshanbaga to'g'ri kelsa, dam olish kuni xabarini beramiz
+        # Sarlavha ichidan kun nomini qidirib tekshiramiz
+        if "Yakshanba" in title:
+            return (
+                f"{head}\n\n"
+                "☀️ Bugun — rasmiy dam olish kuni.\n"
+                "O'quv rejasida yakshanba kunlari uchun darslar ko'zda tutilmagan."
+            )
+        
+        # Standart holat (agar dars kunida o'qituvchi davomat kiritmagan bo'lsa)
         return (
             f"{head}\n\n"
             "✅ Bu davrda qoldirilgan dars yo'q.\n\n"
