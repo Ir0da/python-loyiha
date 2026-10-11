@@ -60,7 +60,11 @@ def get_token(telegram_id, role):
         )
         row = cursor.fetchone()
         cursor.close()
-    return row[0] if row else None
+    
+    # ✅ TO'G'RILANDI: Bo'shlik va xatoliklarni oldini olish uchun eng xavfsiz tekshiruv
+    if row and isinstance(row, (tuple, list)) and len(row) > 0:
+        return row[0]
+    return None
 
 def delete_user(telegram_id, role):
     """Foydalanuvchi tizimdan chiqqanda ma'lumotlarini o'chirish."""
