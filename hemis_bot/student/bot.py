@@ -1,4 +1,6 @@
 import asyncio
+import os
+from aiohttp import web
 
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -9,6 +11,11 @@ from core.db import init_db
 from core.hemis import close_session
 from . import ROLE, handlers_daily, handlers_overall, handlers_semester
 from .keyboards import main_keyboard
+
+
+# 🌐 Render serveri "Timed Out" xatosi bermasligi uchun soxta sahifa funksiyasi
+async def handle(request):
+    return web.Response(text="Bot muvaffaqiyatli ishlamoqda!")
 
 
 async def main():
@@ -28,6 +35,17 @@ async def main():
     dp.include_router(handlers_daily.router)
     dp.include_router(handlers_semester.router)
     dp.include_router(handlers_overall.router)
+
+    # 🚀 RENDER UCHUN SOXTA VEB-SERVERNI ISHGA TUSHIRISH QISMI:
+    app = web.Application()
+    app.router.add_get('/', handle)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    
+    # Render avtomatik taqdim etadigan 10000-portni tinglaymiz
+    port = int(os.environ.get("PORT", 10000)) 
+    site = web.TCPSite(runner, '0.0.0.0', port)
+    await site.start()
 
     print("🤖 O'quvchi boti ishga tushdi...")
     try:
