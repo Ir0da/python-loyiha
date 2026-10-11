@@ -79,8 +79,11 @@ async def on_day_selected(callback: types.CallbackQuery, state: FSMContext):
         return
 
     start, end, title = _range(kind)
+    
+    # ✅ TO'G'RILANDI: edit=False qilindi. Endi eski davomatlar o'chib ketmaydi,
+    # bot har safar pastdan yangi toza xabar ko'rinishida chiqaradi!
     await show_range(
-        callback.message, callback.from_user.id, start, end, title, edit=True
+        callback.message, callback.from_user.id, start, end, title, edit=False
     )
 
 
@@ -101,5 +104,3 @@ async def on_date_entered(message: types.Message, state: FSMContext):
     await show_range(
         message, message.from_user.id, day, day, fmt_date_full(day)
     )
-
-    
